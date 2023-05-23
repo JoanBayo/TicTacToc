@@ -1,49 +1,40 @@
 from flask import Flask, request, render_template
 from jinja2 import Environment, FileSystemLoader
 from flask import Flask, redirect, url_for, session
+
+from backend import executarSQL, executarSelectSQL
 from flask_session import Session
 import mariadb
 import sys
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 
 Session(app)
 
 try:
-    conn = mariadb.connect(
-        user="pythonMaster",
-        password="Admin1234",
-        host="localhost",
-        port=3306,
-        database="tictactocDB"
-    )
-    print('Conexión exitosa a la base de datos')
 
     sentenciaSQL = f"""CREATE TABLE IF NOT EXISTS usuarios (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario VARCHAR(255),
-  contrasenya VARCHAR(255)
-  );
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario VARCHAR(255),
+    contrasenya VARCHAR(255)
+    );
     """
-    cur = conn.cursor()
-    cur.execute(sentenciaSQL)
-    conn.commit()
+
+    executarSQL(sentenciaSQL)
 
     sentenciaSQL = f"""CREATE TABLE IF NOT EXISTS partidas (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  idJugador INT,
-  data DATETIME,
-  taulell VARCHAR(255),
-  torn INT,
-  FOREIGN KEY (idJugador) REFERENCES usuarios(id)
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    idJugador INT,
+    data DATETIME,
+    taulell VARCHAR(255),
+    torn INT,
+    FOREIGN KEY (idJugador) REFERENCES usuarios(id)
+    );
     """
-    cur = conn.cursor()
-    cur.execute(sentenciaSQL)
-    conn.commit()
-    conn.close()
+    executarSQL(sentenciaSQL)
+
 
 except mariadb.Error as e:
     print(f"Error conectando a la base de datos: {e}")
@@ -74,19 +65,10 @@ def login():
 
         password = request.form['password']
         try:
-            conn = mariadb.connect(
-                user="pythonMaster",
-                password="Admin1234",
-                host="localhost",
-                port=3306,
-                database="tictactocDB"
-            )
 
             sentenciaSQL = f"""SELECT * from usuarios where usuario = '{username}';
                """
-            cur = conn.cursor()
-            cur.execute(sentenciaSQL)
-            resultados = cur.fetchall()
+            resultados = executarSelectSQL(sentenciaSQL)
 
             if len(resultados) == 0:
                 resultados = '("algoalgoaglo","algoalgoaglo","algoalgoaglo")'
@@ -94,8 +76,6 @@ def login():
             resultados = ' '.join(str(elemento) for elemento in resultados).replace("(", "").replace(")", "").replace(
                 "'", "")
             resultados = [elem.strip() for elem in resultados.split(',')]
-
-            conn.close()
 
             if resultados[1] != username:
                 info = {"info": 'Usuario no encontrado'}
@@ -129,24 +109,16 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+
         try:
-            conn = mariadb.connect(
-                user="pythonMaster",
-                password="Admin1234",
-                host="localhost",
-                port=3306,
-                database="tictactocDB"
-            )
 
             sentenciaSQL = f"""SELECT * from usuarios where usuario = '{username}';
         """
-            cur = conn.cursor()
-            cur.execute(sentenciaSQL)
-            resultados = cur.fetchall()
-            conn.close()
+            resultados = executarSelectSQL(sentenciaSQL)
 
         except mariadb.Error:
             sys.exit(1)
+
         if len(resultados) != 0:
             info = {"info": 'El nombre de usuario ya está en uso. Por favor, elige otro.'}
             enviroment = Environment(loader=FileSystemLoader("Template/"))
@@ -155,13 +127,6 @@ def register():
             return f'{contingut}'
         else:
             try:
-                conn = mariadb.connect(
-                    user="pythonMaster",
-                    password="Admin1234",
-                    host="localhost",
-                    port=3306,
-                    database="tictactocDB"
-                )
 
                 sentenciaSQL = f"""INSERT INTO usuarios
                 (usuario, contrasenya)
@@ -169,10 +134,7 @@ def register():
                 ('{username}','{password}');
                 """
 
-                cur = conn.cursor()
-                cur.execute(sentenciaSQL)
-                conn.commit()
-                conn.close()
+                executarSQL(sentenciaSQL)
 
                 info = {"info": 'Usuario registrado correctamente'}
                 enviroment = Environment(loader=FileSystemLoader("Template/"))
@@ -186,6 +148,17 @@ def register():
     enviroment = Environment(loader=FileSystemLoader("Template/"))
     template = enviroment.get_template("register.html")
     info = ""
+    contingut = template.render(info)
+    return f'{contingut}'
+
+
+@app.route('/gameMove', methods=['POST', 'GET'])
+def gameMove():
+
+    info = {"tokens1": session['tokens1'], "tokens2": session['tokens2'], "board": session["board"]}
+    print(info)
+    enviroment = Environment(loader=FileSystemLoader("Template/"))
+    template = enviroment.get_template("base.html")
     contingut = template.render(info)
     return f'{contingut}'
 
@@ -209,6 +182,10 @@ def move():
         enviroment = Environment(loader=FileSystemLoader("Template/"))
         template = enviroment.get_template("finalGame.html")
         contingut = template.render(info)
+        sentenciaSQL = f"""DELETE FROM partidas
+                      where id = {session["idGame"]}
+                      """
+        executarSQL(sentenciaSQL)
         return f'{contingut}'
 
     elif winer == 2:
@@ -216,6 +193,10 @@ def move():
         enviroment = Environment(loader=FileSystemLoader("Template/"))
         template = enviroment.get_template("finalGame.html")
         contingut = template.render(info)
+        sentenciaSQL = f"""DELETE FROM partidas
+                      where id = {session["idGame"]}
+                      """
+        executarSQL(sentenciaSQL)
         return f'{contingut}'
 
     elif winer == 3:
@@ -223,9 +204,14 @@ def move():
         enviroment = Environment(loader=FileSystemLoader("Template/"))
         template = enviroment.get_template("finalGame.html")
         contingut = template.render(info)
+        sentenciaSQL = f"""DELETE FROM partidas
+                      where id = {session["idGame"]}
+                      """
+        executarSQL(sentenciaSQL)
         return f'{contingut}'
 
     info = {"tokens1": session['tokens1'], "tokens2": session['tokens2'], "board": session["board"]}
+    print(info)
     enviroment = Environment(loader=FileSystemLoader("Template/"))
     template = enviroment.get_template("base.html")
     contingut = template.render(info)
@@ -274,63 +260,44 @@ def checkWiner(chess, player):
 @app.route('/saveGame')
 def saveGame():
     try:
-        conn = mariadb.connect(
-            user="pythonMaster",
-            password="Admin1234",
-            host="localhost",
-            port=3306,
-            database="tictactocDB"
-        )
         print(session["userId"])
         sentenciaSQL = f"""INSERT INTO partidas
         (idJugador, data, taulell, torn)
         VALUES
         ({session["userId"]},DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),'{session["board"]}',{session["playerActive"]});
         """
-        print(sentenciaSQL)
-        cur = conn.cursor()
-        cur.execute(sentenciaSQL)
-        conn.commit()
-        conn.close()
+        executarSQL(sentenciaSQL)
 
     except mariadb.Error:
         sys.exit(1)
 
-    print("hola")
     return retornaPagina()
 
 
 def retornaPagina():
+    print(session["board"])
     info = {"tokens1": session['tokens1'], "tokens2": session['tokens2'], "board": session["board"]}
     enviroment = Environment(loader=FileSystemLoader("Template/"))
     template = enviroment.get_template("base.html")
     contingut = template.render(info)
     return f'{contingut}'
 
+
 @app.route('/recoverGame')
 def recoverGame():
-    registredGames =[]
+    registredGames = []
     try:
-        conn = mariadb.connect(
-            user="pythonMaster",
-            password="Admin1234",
-            host="localhost",
-            port=3306,
-            database="tictactocDB"
-        )
+
         sentenciaSQL = f"""SELECT id,DATE_FORMAT(data, '%Y-%m-%d %H:%i:%s'),taulell,torn from partidas where 
         idJugador = '{session["userId"]}' order by data desc;
            """
 
-        cur = conn.cursor()
-        cur.execute(sentenciaSQL)
-        resultados = cur.fetchall()
-        print(resultados)
+        resultados = executarSelectSQL(sentenciaSQL)
 
         for x in resultados:
             registredGames.append(x)
 
-        registredGames ={"registredGames": registredGames}
+        registredGames = {"registredGames": registredGames}
 
         enviroment = Environment(loader=FileSystemLoader("Template/"))
         template = enviroment.get_template("recoverGame.html")
@@ -344,36 +311,31 @@ def recoverGame():
 
 @app.route('/game/<idGame>')
 def choseGame(idGame):
-    recoverThisGame = []
+    session["idGame"] = idGame
     try:
-        conn = mariadb.connect(
-            user="pythonMaster",
-            password="Admin1234",
-            host="localhost",
-            port=3306,
-            database="tictactocDB"
-        )
-
+        resultatGame = []
         sentenciaSQL = f"""SELECT taulell,torn from partidas where 
               id = '{idGame}';
                  """
 
-        cur = conn.cursor()
-        cur.execute(sentenciaSQL)
-        resultados = cur.fetchall()
-        print(resultados)
-        for x in resultados:
-            recoverThisGame.append(x)
+        resultados = executarSelectSQL(sentenciaSQL)
 
-        recoverThisGame = {"registredGames": recoverThisGame}
+        session["board"] = resultados[0][0].replace("[", "").replace("]", "").replace(",", "")
 
-        print(recoverThisGame)
+        for i in session["board"].split():
+            resultatGame.append(int(i))
 
-        info = {"tokens1": session['tokens1'], "tokens2": session['tokens2'], "board": recoverThisGame[0]}
-        enviroment = Environment(loader=FileSystemLoader("Template/"))
-        template = enviroment.get_template("base.html")
-        contingut = template.render(info)
-        return f'{contingut}'
+        session['board'] = resultatGame
+        if resultados[0][1] == 1:
+            session['tokens1'] = 1
+            session['tokens2'] = 0
+            session["playerActive"] = 1
+        else:
+            session['tokens1'] = 0
+            session['tokens2'] = 1
+            session["playerActive"] = 2
+
+        return redirect(url_for('gameMove'))
 
     except mariadb.Error:
         retornaPagina()
