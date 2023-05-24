@@ -15,38 +15,62 @@ Com podeu comprovar en el fitxer backend.py, és molt fàcil d'utilitzar, i sol 
 
 ## Com funciona el component de MariaDB.
 
-Primer és té que indicar en la variable conn, les dades de la que utilitzarem
+Del nostre component sols haurem d'importar dues funcions al fitxer principal amb el següent import
 ```
- conn = mariadb.connect(
-            user="nom del Usuari",
-            password="contrasenya",
-            host="host",
-            port=port,
-            database="base de dades a utilitzar"
+from backend import executarSQL, executarSelectSQL
+  ```
+Primer és té que indicar en la variable conn, les dades de la que utilitzarem, això es tindra que ficar en el principi de cada funcio del component.
+```
+conn = mariadb.connect(
+        user="nom del Usuari",
+        password="contrasenya",
+        host="host",
+        port=port,
+        database="base de dades a utilitzar"
         )
   ```
-Posteriorment en el cas del SELECT amb les següents comandes executem el SELECT i ens torna el resultat en la variable resultat i posteriorment fiquem un retorn per tornar la informació. 
+Per fer un SELECT necessitarem executarSelectSQL i introduir com a variable la sentencia SQL a executar, com en el següent exemple:
 ```
-    cur = conn.cursor()
-    cur.execute(sentencia)
-    conn.commit()
-    resultat = cur.fetchall()
-    conn.close()
-        return resultat
-  ```
+sentenciaSQL = f"""SELECT id,DATE_FORMAT(data, '%Y-%m-%d %H:%i:%s'),taulell,torn from partidas where 
+idJugador = '{session["userId"]}' order by data desc;
+   """
 
-En tots els altres casos, executem la comanda i es farà l'acció.
+resultados = executarSelectSQL(sentenciaSQL)
+  ```
+Posteriorment s'executra el contingut de dins de la funció, amb les següents comandes executem el SELECT i ens torna el resultat en la variable resultat, fican un retorn obtindrem la informació en el fitxer principal amb el resultats. 
 ```
-    cur = conn.cursor()
-    cur.execute(sentencia)
-    conn.commit()
+cur = conn.cursor()
+cur.execute(sentencia)
+conn.commit()
+resultat = cur.fetchall()
+conn.close()
 
-    conn.close()
-  ```
-En tots dos casos al final sempre hem de tancar la consulta per tal de no provocar errors amb:
-``` sh
-    conn.close()
-  ```
-Com ja s'ha vist anteriorment.
+return resultat
+```
+Per fer qualsevol altra consulta (UPDATE, INSERT, CREATE) necessitarem executarSQL i introduir també com a variable la sentencia SQL a executar
+```
+sentenciaSQL = f"""CREATE TABLE IF NOT EXISTS usuarios (
+id INT AUTO_INCREMENT PRIMARY KEY,
+usuario VARCHAR(255),
+contrasenya VARCHAR(255)
+);
+"""
+```
+```
+sentenciaSQL = f"""INSERT INTO usuarios
+    (usuario, contrasenya)
+    VALUES
+    ('{username}','{password}');
+    """
 
+    executarSQL(sentenciaSQL)
+```
+Llavors amb el contingut de la funció s'executara i en aquest cas no retornara res, ja que sol és buscar una acció i no obtenir un resultat.
+```
+cur = conn.cursor()
+cur.execute(sentencia)
+conn.commit()
+
+conn.close()
+  ```
 Teniu tot el compnent de mariaDB a [backend.py](backend.py)
